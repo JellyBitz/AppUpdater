@@ -7,3 +7,6 @@ packages/
 # Auto generated files
 AppUpdater/bin/
 AppUpdater/obj/
+
+# Github Pages - Executable self replacer sample 
+!docs/hosting-sample/releases/patch-1.0.0.3/AppUpdater.exe

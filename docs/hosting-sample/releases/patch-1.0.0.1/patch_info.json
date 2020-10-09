@@ -1,0 +1,11 @@
+{
+	"Version":"1.0.0.1",
+	"Host":"http://127.0.0.1/hosting-sample/releases/patch-1.0.0.1/",
+	"Files":
+	[
+		"settings.ini",
+		"lang/locale.txt",
+		"client/settings/config.cfg"
+	],
+	"PatchRequiredUrl":""
+}
