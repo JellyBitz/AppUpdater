@@ -22,7 +22,7 @@ namespace AppUpdater
             // Create a downloader with the application version
             var patcher = new PatchManager(System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
             Console.WriteLine("Checking for updates...");
-            var patchVersion = await patcher.CheckForUpdates("http://127.0.0.1/hosting-sample/patch_version.json");
+            var patchVersion = await patcher.CheckForUpdates("https://jellybitz.github.io/AppUpdater/hosting-sample/releases/patch_version.json");
             // Check if an update is available
             if (patchVersion.IsUpdateAvailable)
             {

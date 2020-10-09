@@ -1,6 +1,6 @@
 {
 	"Version":"1.0.0.1",
-	"Host":"http://127.0.0.1/hosting-sample/releases/patch-1.0.0.1/",
+	"Host":"https://jellybitz.github.io/AppUpdater/hosting-sample/releases/1.0.0.1/",
 	"Files":
 	[
 		"settings.ini",

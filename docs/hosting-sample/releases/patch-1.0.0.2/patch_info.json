@@ -1,9 +1,0 @@
-{
-	"Version":"1.0.0.2",
-	"Host":"http://127.0.0.1/hosting-sample/releases/patch-1.0.0.2/",
-	"Files":
-	[
-		"lang/locale.txt",
-	],
-	"PatchRequiredUrl":"http://127.0.0.1/hosting-sample/releases/patch-1.0.0.1/patch_info.json"
-}

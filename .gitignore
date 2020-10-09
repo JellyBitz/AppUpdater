@@ -8,5 +8,6 @@ packages/
 AppUpdater/bin/
 AppUpdater/obj/
 
-# Github Pages - Executable self replacer sample 
-!docs/hosting-sample/releases/patch-1.0.0.3/AppUpdater.exe
+# Github Pages - Executable samples
+!www/hosting-sample/releases/1.0.0.0/AppUpdater.exe
+!www/hosting-sample/releases/1.0.0.3/AppUpdater.exe
