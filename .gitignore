@@ -1,0 +1,9 @@
+# Visual studio cachce
+.vs/
+
+# Can be restored from nuget
+packages/
+
+# Auto generated files
+AppUpdater/bin/
+AppUpdater/obj/
