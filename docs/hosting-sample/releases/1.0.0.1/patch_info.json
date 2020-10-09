@@ -7,5 +7,5 @@
 		"lang/locale.txt",
 		"client/settings/config.cfg"
 	],
-	"PatchRequiredUrl":""
+	"PatchRequiredUrl":"https://jellybitz.github.io/AppUpdater/hosting-sample/releases/1.0.0.0/patch_info.json"
 }

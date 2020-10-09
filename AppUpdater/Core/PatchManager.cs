@@ -74,6 +74,10 @@ namespace AppUpdater
         /// <param name="PatchVersionUrl">Url location of the version file</param>
         public async Task<PatchVersion> CheckForUpdates(string PatchVersionUrl)
         {
+            // Set SSL/TLS is correctly being set
+            ServicePointManager.Expect100Continue = true;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
             // Create web client to download the patch info
             using (WebClient web = new WebClient())
             {
@@ -89,7 +93,9 @@ namespace AppUpdater
         /// <param name="Patch">Patch to check</param>
         public async Task PrepareDownload(PatchVersion Patch)
         {
-
+            // Set SSL/TLS is correctly being set
+            ServicePointManager.Expect100Continue = true;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
             // Create web client to check patch files
             using (WebClient web = new WebClient())
@@ -105,8 +111,8 @@ namespace AppUpdater
                     // Download, read and convert JSON to class
                     patchInfo = JsonConvert.DeserializeObject<PatchInfo>(await web.DownloadStringTaskAsync(patchRequiredUrl));
 
-                    // If the version is lower than my current, just stop it
-                    if (Version.Parse(patchInfo.Version) < CurrentVersion)
+                    // If the version is the same as my current version, stop it
+                    if (Version.Parse(patchInfo.Version) == CurrentVersion)
                         break;
 
                     // Add all files from patch

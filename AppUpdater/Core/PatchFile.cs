@@ -46,7 +46,9 @@ namespace AppUpdater
         /// <param name="TempPath">Temporal path where the file will be located on download</param>
         public async Task Download(string TempPath)
         {
-            // TO DO: Make sure TSL is marked
+            // Set SSL/TLS is correctly being set
+            ServicePointManager.Expect100Continue = true;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 
             // Creates a client to download the resource
             using (WebClient web = new WebClient())
