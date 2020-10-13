@@ -10,5 +10,4 @@ AppUpdater/obj/
 
 # Github Pages - Executable samples
 !docs/hosting-sample/releases/1.0.0.0/Application/AppUpdater.exe
-!docs/hosting-sample/releases/1.0.0.0/Application/Newtonsoft.Json.dll
 !docs/hosting-sample/releases/1.0.0.3/AppUpdater.exe
