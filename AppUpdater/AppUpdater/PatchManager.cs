@@ -1,9 +1,12 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
+using System.Text;
+
 namespace AppUpdater
 {
     /// <summary>
@@ -82,7 +85,7 @@ namespace AppUpdater
             using (WebClient web = new WebClient())
             {
                 // Download, read and convert JSON to class
-                PatchVersion patchVersion = JsonConvert.DeserializeObject<PatchVersion>(await web.DownloadStringTaskAsync(PatchVersionUrl));
+                PatchVersion patchVersion = JsonDeserializer<PatchVersion>(await web.DownloadStringTaskAsync(PatchVersionUrl));
                 patchVersion.IsUpdateAvailable = CurrentVersion < Version.Parse(patchVersion.LastestVersion);
                 return patchVersion;
             }
@@ -109,7 +112,7 @@ namespace AppUpdater
                 do
                 {
                     // Download, read and convert JSON to class
-                    patchInfo = JsonConvert.DeserializeObject<PatchInfo>(await web.DownloadStringTaskAsync(patchRequiredUrl));
+                    patchInfo = JsonDeserializer<PatchInfo>(await web.DownloadStringTaskAsync(patchRequiredUrl));
 
                     // If the version is the same as my current version, stop it
                     if (Version.Parse(patchInfo.Version) == CurrentVersion)
@@ -224,6 +227,32 @@ namespace AppUpdater
                 return;
             IsUpdating = false;
             IsUpdatePaused = true;
+        }
+        #endregion
+
+        #region Private Helpers
+        /// <summary>
+        /// Serialize an object to JSON string
+        /// </summary>
+        private static string JsonSerializer<T>(T obj)
+        {
+            using (MemoryStream ms = new MemoryStream())
+            {
+                DataContractJsonSerializer ser = new DataContractJsonSerializer(typeof(T));
+                ser.WriteObject(ms, obj);
+                return Encoding.UTF8.GetString(ms.ToArray());
+            }
+        }
+        /// <summary>
+        /// Deserialize a JSON string to an object
+        /// </summary>
+        private static T JsonDeserializer<T>(string jsonString)
+        {
+            using (MemoryStream ms = new MemoryStream(Encoding.UTF8.GetBytes(jsonString)))
+            {
+                DataContractJsonSerializer ser = new DataContractJsonSerializer(typeof(T));
+                return (T)ser.ReadObject(ms);
+            }
         }
         #endregion
 
