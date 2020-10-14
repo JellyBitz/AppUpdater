@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
-using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 
@@ -42,15 +41,13 @@ namespace AppUpdater
         /// </summary>
         public bool IsUpdating { get; private set; }
 
-        public int DownloadProgressValue {
+        public float DownloadProgressValue {
             get
             {
                 return m_PatchFilesProgressValue;
             }
             private set
             {
-                if (value == m_PatchFilesProgressValue)
-                    return;
                 // Set if is a new value
                 m_PatchFilesProgressValue = value;
                 // call event
@@ -195,7 +192,11 @@ namespace AppUpdater
 
             // Delete the temporal path used
             Directory.Delete(tempPath,true);
-            
+
+            // Check if update has been paused
+            if (IsUpdatePaused)
+                return;
+
             // Update executable as last one and restart application
             if (updateExe != null)
             {
@@ -211,10 +212,17 @@ namespace AppUpdater
                 await Task.Run(() => File.Move(updateExe.TempPath, executablePath));
                 // call event
                 OnFileUpdated(updateExe.FullPath);
+                // call event
+                OnUpdateCompleted();
                 // Restart application
                 OnApplicationRestart();
                 System.Diagnostics.Process.Start(executablePath);
                 Environment.Exit(0);
+            }
+            else
+            {
+                // call event
+                OnUpdateCompleted();
             }
         }
         /// <summary>
@@ -283,6 +291,15 @@ namespace AppUpdater
             DownloadProgressValue = m_PatchFilesCount * 100 / m_PatchFilesMax;
         }
         /// <summary>
+        /// Called when the update has been finished
+        /// </summary>
+        public event UpdateCompletedEventHandler UpdateCompleted;
+        public delegate void UpdateCompletedEventHandler();
+        private void OnUpdateCompleted()
+        {
+            UpdateCompleted?.Invoke();
+        }
+        /// <summary>
         /// Called when the application is going to be replaced itself to be launched as updated
         /// </summary>
         public event ApplicationRestartEventHandler ApplicationRestart;
@@ -295,8 +312,8 @@ namespace AppUpdater
         /// Called when the progress value has changed
         /// </summary>
         public event ProgressValueChangedEventHandler ProgressValueChanged;
-        public delegate void ProgressValueChangedEventHandler(int NewValue);
-        private void OnProgressValueChanged(int NewValue)
+        public delegate void ProgressValueChangedEventHandler(float NewValue);
+        private void OnProgressValueChanged(float NewValue)
         {
             ProgressValueChanged?.Invoke(NewValue);
         }

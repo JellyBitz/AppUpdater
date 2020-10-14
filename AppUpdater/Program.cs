@@ -37,7 +37,11 @@ namespace AppUpdater
                 };
                 patcher.ProgressValueChanged += (Value) =>
                 {
-                    Console.WriteLine("Percentage Now: " + Value + "%");
+                    Console.WriteLine("Percentage Now: " + Math.Round(Value,2) + "%");
+                };
+                patcher.UpdateCompleted += () =>
+                {
+                    Console.WriteLine("Update finished!");
                 };
                 patcher.ApplicationRestart += () =>
                 {
