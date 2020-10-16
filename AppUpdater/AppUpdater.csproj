@@ -48,6 +48,7 @@
     <Compile Include="AppUpdater\PatchVersion.cs" />
     <Compile Include="AppUpdater\PatchManager.cs" />
     <Compile Include="AppUpdater\PatchFile.cs" />
+    <Compile Include="AppUpdater\Version.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

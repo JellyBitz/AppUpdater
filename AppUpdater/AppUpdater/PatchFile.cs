@@ -10,7 +10,6 @@ namespace AppUpdater
     /// </summary>
     public class PatchFile
     {
-
         #region Public Properties
         /// <summary>
         /// Relative path where the file will be located after downloading
@@ -58,7 +57,10 @@ namespace AppUpdater
                 {
                     this.TempPath = Path.Combine(TempPath, Path.GetRandomFileName());
                 } while (File.Exists(this.TempPath));
-                
+
+                // Start tracking the downloading progress
+                web.DownloadProgressChanged += (o, e) => OnDownloadProgressChanged(o, e);
+
                 // Put the resource on temporal location while downloading
                 await web.DownloadFileTaskAsync(new Uri(Url), this.TempPath);
             }
@@ -92,6 +94,17 @@ namespace AppUpdater
                 // Successfully updated, avoid doing it twice
                 TempPath = null;
             }
+        }
+        #endregion
+
+        #region Events
+        /// <summary>
+        /// Called when the download file has changed
+        /// </summary>
+        public event DownloadProgressChangedEventHandler DownloadProgressChanged;
+        private void OnDownloadProgressChanged(object f, DownloadProgressChangedEventArgs e)
+        {
+            DownloadProgressChanged?.Invoke(f,e);
         }
         #endregion
     }

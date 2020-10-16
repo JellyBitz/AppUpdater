@@ -8,7 +8,7 @@ namespace AppUpdater
         /// </summary>
         static void Main(string[] args)
         {
-            Console.Title = "AppUpdater v" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            Console.Title = "AppUpdater";
             // Start update async
             UpdateAsync();
             // Exit only with escape key
@@ -19,38 +19,33 @@ namespace AppUpdater
         /// </summary>
         public static async void UpdateAsync()
         {
-            // Create a downloader with the application version
-            var patcher = new PatchManager(System.Reflection.Assembly.GetExecutingAssembly().GetName().Version);
-            Console.WriteLine("Checking for updates...");
-            var patchVersion = await patcher.CheckForUpdates("https://jellybitz.github.io/AppUpdater/hosting-sample/releases/patch_version.json");
+            // Create a downloader with the patcher version
+            var patcher = new PatchManager();
+            Console.WriteLine("AppUpdater " + (patcher.CurrentVersion == new Version() ? "(Default)" : "v" + patcher.CurrentVersion));
+            Console.WriteLine(" * Checking for updates...");
+            var patchVersion = await patcher.CheckForUpdates("https://jellybitz.github.io/AppUpdater/standart-sample/patch_version.json");
             // Check if an update is available
             if (patchVersion.IsUpdateAvailable)
             {
+                // Collect all files to be downloaded
                 await patcher.PrepareDownload(patchVersion);
-                patcher.DownloadingFile += (Path) =>
-                {
-                    Console.WriteLine("Downloading: " + Path);
-                };
-                patcher.FileUpdated += (Path) =>
-                {
-                    Console.WriteLine("Updating: " + Path);
-                };
-                patcher.ProgressValueChanged += (Value) =>
-                {
-                    Console.WriteLine("Percentage Now: " + Math.Round(Value,2) + "%");
-                };
-                patcher.UpdateCompleted += () =>
-                {
-                    Console.WriteLine("Update finished!");
-                };
+
+                // Supported events...
+                patcher.FileReadyToDownload += (Path) => Console.WriteLine(" File Ready: " + Path);
+                patcher.FileDownloadProgressValueChanged += (Path, e) => Console.WriteLine(" File Downloading: " + Path + " " + Math.Round(e.BytesReceived * 100f / e.TotalBytesToReceive, 2) + "%");
+                patcher.FileUpdated += (Path) => Console.WriteLine(" File Updated: " + Path);
+                patcher.DownloadProgressValueChanged += (FilesCount,FilesMax) => Console.WriteLine(" * Update on " + Math.Round(FilesCount * 100f / FilesMax, 2) + "%");
+                patcher.PatchCompleted += (Version) => Console.WriteLine(" * Patch updated, your version now: "+Version);
+                patcher.UpdateCompleted += () => Console.WriteLine(" * Update has been finished!");
                 patcher.ApplicationRestart += () =>
                 {
-                    Console.WriteLine("The application is going to be restarted.\n > Press any key twice to Continue!");
+                    Console.WriteLine(" * The application is going to be restarted.\n > Press any key twice to Continue!");
                     // Twice since the void main is consuming one
                     Console.ReadKey();
                 };
-                Console.WriteLine("Updating application...");
+
                 // Start update all prepared files
+                Console.WriteLine("Updating application...");
                 await patcher.StartUpdate();
             }
             else

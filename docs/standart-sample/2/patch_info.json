@@ -1,0 +1,9 @@
+{
+	"Version":"2",
+	"Host":"https://jellybitz.github.io/AppUpdater/standart-sample/2/",
+	"Files":
+	[
+		"lang/locale.txt",
+	],
+	"PatchRequiredUrl":"https://jellybitz.github.io/AppUpdater/standart-sample/1/patch_info.json"
+}

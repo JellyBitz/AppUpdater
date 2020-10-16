@@ -1,0 +1,11 @@
+{
+	"Version":"1",
+	"Host":"https://jellybitz.github.io/AppUpdater/standart-sample/1/",
+	"Files":
+	[
+		"settings.ini",
+		"lang/locale.txt",
+		"client/settings/config.cfg"
+	],
+	"PatchRequiredUrl":"https://jellybitz.github.io/AppUpdater/standart-sample/0/patch_info.json"
+}
