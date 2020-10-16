@@ -9,5 +9,5 @@ AppUpdater/bin/
 AppUpdater/obj/
 
 # Github Pages - Executable samples
-!docs/hosting-sample/releases/1.0.0.0/Application/AppUpdater.exe
-!docs/hosting-sample/releases/1.0.0.3/AppUpdater.exe
+!docs/standart-sample/0/Application/AppUpdater.exe
+!docs/standart-sample/3/AppUpdater.exe
