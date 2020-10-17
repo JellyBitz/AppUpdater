@@ -237,6 +237,8 @@ namespace AppUpdater
 
                     // call event
                     OnFileReadyToDownload(updateExe.FullPath);
+                    // track event
+                    updateExe.DownloadProgressChanged += (o, e) => OnFileDownloadProgressValueChanged(updateExe.FullPath, e);
                     // download it
                     await updateExe.Download("");
                     // update it slightly different (delete super old, move old and forget then move new)
