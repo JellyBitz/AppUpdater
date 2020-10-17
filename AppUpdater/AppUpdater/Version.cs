@@ -68,6 +68,8 @@
         }
         public override bool Equals(object obj)
         {
+            if(obj is Version _obj)
+                return Compare(this, _obj) == 0;
             return base.Equals(obj);
         }
         public override int GetHashCode()

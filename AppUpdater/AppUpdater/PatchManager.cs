@@ -151,11 +151,13 @@ namespace AppUpdater
                 if (!SupportOldVersion && patchVersion > CurrentVersion)
                     throw new ApplicationException("The version of your application is too old to be updated.");
 
+                // Check if there is cache to synchronize
+                LoadCache();
+
                 m_PatchFilesMax = PatchFiles.Count;
                 m_PatchFilesCount = 0;
             }
         }
-
         /// <summary>
         /// Start/continue updating the application
         /// </summary>
@@ -175,8 +177,7 @@ namespace AppUpdater
             if (!Directory.Exists(tempPath))
                 Directory.CreateDirectory(tempPath);
 
-            // Check if the executable is going to be updated
-            PatchFile updateExe = null;
+            // Path to check if the executable needs to be updated
             var exePath = Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
 
             // Start Downloading files from old patches to new ones
@@ -187,7 +188,8 @@ namespace AppUpdater
                 var patch = Patches[version];
                 // Create a different instance of keys to remove it without issues
                 var paths = new List<string>(patch.Keys);
-
+                // Check if executable is going to be replaced to update as last one
+                PatchFile updateExe = null;
                 // Download and update each file from this version
                 foreach (var path in paths)
                 {
@@ -211,6 +213,9 @@ namespace AppUpdater
                     // remove it from tracking
                     patch.Remove(path);
                     PatchFiles.Remove(path);
+                    
+                    // Create backup to continue the update on restart
+                    SaveCache(version, patch);
 
                     // call event
                     OnFileUpdated(f.FullPath);
@@ -219,11 +224,40 @@ namespace AppUpdater
                     if (IsUpdatePaused)
                         break;
                 }
+                
+                // Check if update has been paused
+                if (IsUpdatePaused)
+                    break;
 
-                // Update version if is being automatically handled
-                this.CurrentVersion = version;
-                if (m_IsHandlingVersion)
-                    SaveVersion();
+                // Update executable as last one and restart application
+                if (updateExe != null)
+                {
+                    // Delete the temporal path used
+                    Directory.Delete(tempPath, true);
+
+                    // call event
+                    OnFileReadyToDownload(updateExe.FullPath);
+                    // download it
+                    await updateExe.Download("");
+                    // update it slightly different (delete super old, move old and forget then move new)
+                    var thrashPath = Path.Combine(Path.GetTempPath(), exePath + ".old");
+                    if (File.Exists(thrashPath))
+                        await Task.Run(() => File.Delete(thrashPath));
+                    await Task.Run(() => File.Move(exePath, thrashPath));
+                    await Task.Run(() => File.Move(updateExe.TempPath, exePath));
+                    // call event
+                    OnFileUpdated(updateExe.FullPath);
+                    // delete cache
+                    DeleteCache();
+                    // call event
+                    OnPatchCompleted(version);
+                    // Restart application
+                    OnApplicationRestart();
+                    // Execute new executable and exit from this one
+                    System.Diagnostics.Process.Start(exePath);
+                    Environment.Exit(0);
+                    return;
+                }
 
                 // call event
                 OnPatchCompleted(version);
@@ -232,34 +266,11 @@ namespace AppUpdater
             // Delete the temporal path used
             Directory.Delete(tempPath,true);
 
-            // Check if update has been paused
-            if (IsUpdatePaused)
-                return;
-
-            // Update executable as last one and restart application
-            if (updateExe != null)
+            // Patch finished
+            if (PatchFiles.Count == 0)
             {
-                // call event
-                OnFileReadyToDownload(updateExe.FullPath);
-                // download it
-                await updateExe.Download("");
-                // update it slightly different (delete super old, move old and forget then move new)
-                var thrashPath = Path.Combine(Path.GetTempPath(), exePath + ".old");
-                if (File.Exists(thrashPath))
-                    File.Delete(thrashPath);
-                await Task.Run(() => File.Move(exePath, thrashPath));
-                await Task.Run(() => File.Move(updateExe.TempPath, exePath));
-                // call event
-                OnFileUpdated(updateExe.FullPath);
-                // call event
-                OnUpdateCompleted();
-                // Restart application
-                OnApplicationRestart();
-                System.Diagnostics.Process.Start(exePath);
-                Environment.Exit(0);
-            }
-            else
-            {
+                // delete cache
+                DeleteCache();
                 // call event
                 OnUpdateCompleted();
             }
@@ -284,11 +295,11 @@ namespace AppUpdater
         private Version LoadVersion()
         {
             // Load the current app data if exists
-            var patchDataPath = Path.GetFileNameWithoutExtension(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + ".patch";
-            if (File.Exists(patchDataPath))
+            var patchVersionPath = Path.GetFileNameWithoutExtension(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + ".patch";
+            if (File.Exists(patchVersionPath))
             {
                 // Read patch file structure
-                using (var reader = new BinaryReader(new FileStream(patchDataPath, FileMode.Open)))
+                using (var reader = new BinaryReader(new FileStream(patchVersionPath, FileMode.Open)))
                 {
                     int versionNumbersLength = reader.ReadInt32();
                     uint[] versionNumbers = new uint[versionNumbersLength];
@@ -307,14 +318,88 @@ namespace AppUpdater
         /// </summary>
         private void SaveVersion()
         {
-            var patchDataPath = Path.GetFileNameWithoutExtension(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + ".patch";
+            var patchVersionPath = Path.GetFileNameWithoutExtension(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + ".patch";
             // Write patch file structure
-            using (var writer = new BinaryWriter(new FileStream(patchDataPath, FileMode.Create)))
+            using (var writer = new BinaryWriter(new FileStream(patchVersionPath, FileMode.Create)))
             {
                 writer.Write(CurrentVersion.VersionNumbers.Length);
                 for (int i = 0; i < CurrentVersion.VersionNumbers.Length; i++)
                     writer.Write(CurrentVersion.VersionNumbers[i]);
             }
+        }
+        /// <summary>
+        /// Check cache from update and synchronize files from patches
+        /// </summary>
+        private void LoadCache()
+        {
+            var patchCachePath = Path.GetFileNameWithoutExtension(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + ".patch.cache";
+            if (File.Exists(patchCachePath))
+            {
+                Version cacheVersion = null;
+                Dictionary<string, PatchFile> cachePatch = null;
+                // Read patch file structure
+                using (var reader = new BinaryReader(new FileStream(patchCachePath, FileMode.Open)))
+                {
+                    cacheVersion = new Version(reader.ReadString());
+                    // for each patch file
+                    var filesCount = reader.ReadInt32();
+                    cachePatch = new Dictionary<string, PatchFile>(filesCount);
+                    for (int j = 0; j < filesCount; j++)
+                    {
+                        var file = new PatchFile(reader.ReadString(), reader.ReadString());
+                        cachePatch.Add(file.FullPath, file);
+                    }
+                }
+                // Merge current patches with cache patch to avoid download all the patch again
+                foreach (var version in Patches.Keys)
+                {
+                    if (version == cacheVersion)
+                    {
+                        var patch = Patches[version];
+                        // Create a keys copy to remove from dictionary without issues
+                        var paths = new List<string>(patch.Keys);
+                        // If file doesn't exist on cache patch, then is already updated
+                        foreach (var path in paths)
+                        {
+                            // Avoid update it again
+                            if (!cachePatch.ContainsKey(path))
+                            {
+                                patch.Remove(path);
+                                PatchFiles.Remove(path);
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
+        /// <summary>
+        /// Saves the patch being updated to avoid lossing update progress
+        /// </summary>
+        private void SaveCache(Version Version,Dictionary<string,PatchFile> Patch)
+        {
+            var patchCachePath = Path.GetFileNameWithoutExtension(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + ".patch.cache";
+            // Write patch file structure
+            using (var writer = new BinaryWriter(new FileStream(patchCachePath, FileMode.Create)))
+            {
+                writer.Write(Version.ToString());
+                // for each patch file
+                writer.Write(Patch.Count);
+                foreach (var file in Patch.Values)
+                {
+                    writer.Write(file.FullPath);
+                    writer.Write(file.Url);
+                }
+            }
+        }
+        /// <summary>
+        /// Delete patch cache
+        /// </summary>
+        private void DeleteCache()
+        {
+            var patchCachePath = Path.GetFileNameWithoutExtension(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName) + ".patch.cache";
+            if (File.Exists(patchCachePath))
+                File.Delete(patchCachePath);
         }
         /// <summary>
         /// Serialize an object to JSON string
@@ -358,9 +443,7 @@ namespace AppUpdater
         public delegate void FileUpdatedEventHandler(string Path);
         private void OnFileUpdated(string Path)
         {
-            // TO DO:
-            // Create backup to continue the update on restart
-            
+            // call attached event
             FileUpdated?.Invoke(Path);
 
             // Count file updated
@@ -374,6 +457,12 @@ namespace AppUpdater
         public delegate void PatchCompletedEventHandler(Version CompletedVersion);
         private void OnPatchCompleted(Version Version)
         {
+            // Update version if is being automatically handled
+            this.CurrentVersion = Version;
+            if (m_IsHandlingVersion)
+                SaveVersion();
+
+            // call attached event
             PatchCompleted?.Invoke(Version);
         }
         /// <summary>
