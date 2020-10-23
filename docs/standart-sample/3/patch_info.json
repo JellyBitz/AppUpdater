@@ -1,9 +1,0 @@
-{
-	"Version":"3",
-	"Host":"https://jellybitz.github.io/AppUpdater/standart-sample/3/",
-	"Files":
-	[
-		"AppUpdater.exe"
-	],
-	"PatchRequiredUrl":"https://jellybitz.github.io/AppUpdater/standart-sample/2/patch_info.json"
-}

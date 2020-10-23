@@ -1,0 +1,99 @@
+﻿<Window x:Class="AppDemo.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:AppDemo"
+        mc:Ignorable="d"
+        Title="AppUpdater (Demo)" 
+        Width="400" Height="200"
+        Loaded="Window_Loaded"
+        WindowStartupLocation="CenterScreen">
+    <!-- Main layout -->
+    <Grid Background="#333">
+
+        <!-- Updating actions & Progress -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+
+        <!-- Actions -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Start/Continue update -->
+            <Button Grid.Column="0"
+                    x:Name="btnStart"
+                    Margin="15 10"
+                    Content="Start"
+                    Click="ButtonStart_Click"
+                    IsEnabled="False"/>
+
+            <!-- Pause update -->
+            <Button Grid.Column="1"
+                    x:Name="btnPause"
+                    Margin="15 10"
+                    Content="Pause"
+                    Click="ButtonPause_Click"
+                    IsEnabled="False">
+            </Button>
+        </Grid>
+
+        <!-- Progress -->
+        <Grid Grid.Row="1"
+              Margin="10"
+              Background="#222">
+            <Grid.RowDefinitions>
+                <RowDefinition/>
+                <RowDefinition/>
+            </Grid.RowDefinitions>
+
+            <!-- Updating progress -->
+            <Slider Grid.Row="0"
+                    x:Name="slrUpdateProgress"
+                    Style="{StaticResource SliderLoadingStyle}"
+                    BorderThickness="2 2 2 0"
+                    Maximum="100"/>
+            <Grid Grid.Row="0"
+                  VerticalAlignment="Center"
+                  Margin="10">
+                <!-- Progress as text -->
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           x:Name="tbkUpdateProgressText"
+                           Foreground="White"/>
+                <TextBlock Grid.Column="1"
+                           x:Name="tbkUpdateProgressPercent"
+                           Foreground="White"/>
+            </Grid>
+
+            <!-- Files Progress -->
+            <Slider Grid.Row="1"
+                    x:Name="slrFileProgress"
+                    Style="{StaticResource SliderLoadingStyle}"
+                    Maximum="100"/>
+            <Grid Grid.Row="1"
+                  VerticalAlignment="Center"
+                  Margin="10">
+                <!-- Progress as text -->
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           x:Name="tbkFileProgressText"
+                           Foreground="White"/>
+                <TextBlock Grid.Column="1"
+                           x:Name="tbkFileProgressPercent"
+                           Foreground="White"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

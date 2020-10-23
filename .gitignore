@@ -1,13 +1,12 @@
 # Visual studio cachce
 .vs/
 
-# Can be restored from nuget
-packages/
-
 # Auto generated files
 AppUpdater/bin/
 AppUpdater/obj/
+AppDemo/bin/
+AppDemo/obj/
 
 # Github Pages - Executable samples
-!docs/standart-sample/0/Application/AppUpdater.exe
-!docs/standart-sample/3/AppUpdater.exe
+!docs/AppDemo/desktop/AppDemo.exe
+!docs/AppDemo/web/3/AppDemo.exe

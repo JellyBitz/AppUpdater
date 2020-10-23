@@ -1,0 +1,10 @@
+{
+	"Version":"3",
+	"Host":"https://jellybitz.github.io/AppUpdater/AppDemo/web/3/",
+	"Files":
+	[
+		"AppDemo.exe",
+		"Media/videos/Handong-Dreamcatcher.mp4"
+	],
+	"PatchRequiredUrl":"https://jellybitz.github.io/AppUpdater/AppDemo/web/2/patch_info.json"
+}
