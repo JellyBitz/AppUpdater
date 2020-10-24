@@ -9,4 +9,5 @@ AppDemo/obj/
 
 # Github Pages - Executable samples
 !docs/AppDemo/desktop/AppDemo.exe
+!docs/AppDemo/desktop/AppUpdater.dll
 !docs/AppDemo/web/3/AppDemo.exe
