@@ -24,7 +24,7 @@ namespace AppUpdater
         /// <summary>
         /// Current file being downloaded
         /// </summary>
-        private PatchFile m_CurrentDownload;
+        private PatchFile m_CurrentFileUpdating;
         /// <summary>
         /// Check if the version is being handled by the patcher
         /// </summary>
@@ -52,6 +52,10 @@ namespace AppUpdater
         /// All patches required to successfully update the application
         /// </summary>
         public Dictionary<Version, Dictionary<string, PatchFile>> Patches { get; private set; }
+        /// <summary>
+        /// Path used temporally to download the files
+        /// </summary>
+        public string DownloadingPath { get; set; } = ".dl";
         /// <summary>
         /// Check if the update process is paused
         /// </summary>
@@ -111,11 +115,11 @@ namespace AppUpdater
         }
 
         /// <summary>
-        /// Prepare the patching files to be downloaded
+        /// Initialize the pachting files to be downloaded and updated
         /// </summary>
         /// <param name="Patch">Patch to prepare</param>
-        /// <param name="SupportOldVersion">Check if your application supports old versions</param>
-        public async Task PrepareDownload(PatchVersion Patch, bool SupportOldVersion = false)
+        /// <param name="SupportOldVersion">Check if your application supports versions that are not found on patch</param>
+        public async Task InitializeUpdate(PatchVersion Patch, bool SupportOldVersion = false)
         {
             // Set SSL/TLS is correctly being set
             ServicePointManager.Expect100Continue = true;
@@ -132,10 +136,9 @@ namespace AppUpdater
                 Patches = new Dictionary<Version, Dictionary<string, PatchFile>>();
 
                 // Create downloading folder and hide it from user
-                string dirPath = ".dl";
-                if (!Directory.Exists(dirPath))
+                if (!Directory.Exists(DownloadingPath))
                 {
-                    DirectoryInfo dirInfo = Directory.CreateDirectory(dirPath);
+                    DirectoryInfo dirInfo = Directory.CreateDirectory(DownloadingPath);
                     dirInfo.Attributes = FileAttributes.Directory | FileAttributes.Hidden;
                 }
 
@@ -163,7 +166,7 @@ namespace AppUpdater
                         if (!PatchFiles.ContainsKey(file))
                         {
                             // Add file to this patch
-                            var patchFile = new PatchFile(file, patchInfo.Host + file, Path.Combine(dirPath, PatchFiles.Count.ToString().PadLeft(8, '0')));
+                            var patchFile = new PatchFile(file, patchInfo.Host + file, Path.Combine(DownloadingPath, PatchFiles.Count.ToString().PadLeft(8, '0')));
                             patch.Add(file, patchFile);
                             PatchFiles.Add(file, patchFile);
                         }
@@ -224,7 +227,7 @@ namespace AppUpdater
                 return;
             IsUpdatePaused = true;
             // Try to pause it
-            m_CurrentDownload?.PauseDownload();
+            m_CurrentFileUpdating?.PauseDownload();
         }
         #endregion
 
@@ -251,115 +254,112 @@ namespace AppUpdater
                 var patch = Patches[version];
                 // Create a different instance of keys to remove it without issues
                 var paths = new List<string>(patch.Keys);
-                // Check if executable is going to be replaced to update as last one
-                PatchFile exe = null;
                 // Download and update each file from this version
-                foreach (var path in paths)
+                for (int i = 0; i < paths.Count; i++)
                 {
-                    var f = patch[path];
+                    // track updating file
+                    var f = m_CurrentFileUpdating = patch[paths[i]];
                     // Check if the file is going to replace this executable
-                    if (path == exePath)
+                    bool isExecutable = f.FullPath == exePath;
+                    if (isExecutable)
                     {
-                        exe = f;
-                        continue;
+                        // Check if is not last file to update
+                        if (i < (paths.Count - 1))
+                        {
+                            // Add it again as last one
+                            paths.Add(f.FullPath);
+                            continue;
+                        }
                     }
-                    // track download
-                    m_CurrentDownload = f;
 
                     // call event
-                    OnFileReadyToDownload(f);
+                    OnFileDownloadReady(f);
 
-                    // Check if has been paused before
-                    if (!IsUpdatePaused)
-                    {
-                        // track event
-                        f.DownloadProgressChanged += (s, e) => OnFileDownloadProgressChanged(s, e);
-                        f.DownloadCompleted += (s, e) => { m_CurrentDownload = null; };
-                    }
+                    // track event
+                    f.DownloadProgressChanged += OnFileDownloadProgressChanged;
 
                     // download it
                     await f.StartDownload();
 
+                    // untrack event
+                    f.DownloadProgressChanged -= OnFileDownloadProgressChanged;
+
                     // Check if download has been paused
                     if (f.IsPaused)
                         break;
+                    
+                    // call event
+                    var completedEventArgs = OnFileDownloadCompleted(f);
 
-                    // track event
-                    f.UpdateCompleted += (s, e) => {
-                        // remove it from tracking
-                        patch.Remove(path);
-                        PatchFiles.Remove(path);
+                    // Check if the updating process is going to be handled by manager
+                    if (completedEventArgs.CancelUpdate)
+                    {
+                        await completedEventArgs.ExecuteAction();
+                    }
+                    else
+                    {
+                        // Check if is executable
+                        if (isExecutable)
+                        {
+                            // update it slightly different (delete super old, move old and forget then move new)
+                            var thrashPath = Path.Combine(DownloadingPath, exePath + ".old");
+                            await Task.Run(() =>
+                            {
+                                if (File.Exists(thrashPath))
+                                    File.Delete(thrashPath);
+                                File.Move(exePath, thrashPath);
+                                File.Move(f.DownloadPath, exePath);
+                            });
+                        }
+                        else
+                        {
+                            // update it
+                            await f.Update();
+                        }
+                    }
 
+                    // Check if is the executable being updated
+                    if (isExecutable)
+                        // delete cache
+                        DeleteCache();
+                    else
                         // Create backup to continue the update on restart
                         SaveCache(version, patch);
 
-                        // call event
-                        OnFileUpdateCompleted(f);
-                    };
+                    // remove it from tracking
+                    patch.Remove(f.FullPath);
+                    PatchFiles.Remove(f.FullPath);
 
-                    // update it
-                    await f.Update();
+                    // call event
+                    OnFileUpdateCompleted(f);
+
+                    // Start calling a events to restart the application
+                    if (isExecutable)
+                    {
+                        // call event
+                        OnPatchCompleted(version);
+
+                        // Check if this is the last file from everything for update
+                        if (PatchFiles.Count == 0)
+                            // call event
+                            OnUpdateCompleted();
+
+                        // Restart application
+                        OnApplicationRestart();
+
+                        // Execute new executable and exit from this one
+                        System.Diagnostics.Process.Start(exePath);
+                        Environment.Exit(0);
+                    }
                 }
+
+                // Stop tracking as updating
+                m_CurrentFileUpdating = null;
 
                 // Check if update has been paused
                 if (IsUpdatePaused)
                     break;
-
-                // Update executable as last one and restart application
-                if (exe != null)
-                {
-                    // call event
-                    OnFileReadyToDownload(exe);
-
-                    // Check if has been paused before
-                    if (!IsUpdatePaused)
-                    {
-                        // track event
-                        exe.DownloadProgressChanged += (s, e) => OnFileDownloadProgressChanged(s, e);
-                        exe.DownloadCompleted += (s, e) => { m_CurrentDownload = null; };
-                    }
-
-                    // download it
-                    await exe.StartDownload();
-
-                    // Check if download has been paused
-                    if (exe.IsPaused)
-                        break;
-
-                    // update it slightly different (delete super old, move old and forget then move new)
-                    var thrashPath = Path.Combine(".dl", exePath + ".old");
-                    if (File.Exists(thrashPath))
-                        await Task.Run(() => File.Delete(thrashPath));
-                    await Task.Run(() => File.Move(exePath, thrashPath));
-                    await Task.Run(() => File.Move(exe.DownloadPath, exePath));
-
-                    // remove it from tracking
-                    patch.Remove(exe.FullPath);
-                    PatchFiles.Remove(exe.FullPath);
-
-                    // delete cache
-                    DeleteCache();
-
-                    // call event
-                    OnFileUpdateCompleted(exe);
-
-                    // call event
-                    OnPatchCompleted(version);
-
-                    // Check if this is the last file to update
-                    if (PatchFiles.Count == 0)
-                        // call event
-                        OnUpdateCompleted();
-
-                    // Restart application
-                    OnApplicationRestart();
-
-                    // Execute new executable and exit from this one
-                    System.Diagnostics.Process.Start(exePath);
-                    Environment.Exit(0);
-                    return;
-                }
-
+                
                 // call event
                 OnPatchCompleted(version);
             }
@@ -516,16 +516,47 @@ namespace AppUpdater
         /// <summary>
         /// Called before the file starts to be downloaded
         /// </summary>
-        public event ReadyToDownloadEventHandler FileReadyToDownload;
-        public delegate void ReadyToDownloadEventHandler(object sender, EventArgs e);
-        private void OnFileReadyToDownload(PatchFile File)
+        public event DownloadReadyEventHandler FileDownloadReady;
+        public delegate void DownloadReadyEventHandler(object sender, EventArgs e);
+        private void OnFileDownloadReady(PatchFile File)
         {
-            FileReadyToDownload?.Invoke(File, EventArgs.Empty);
+            FileDownloadReady?.Invoke(File, EventArgs.Empty);
+        }
+        /// <summary>
+        /// Called when the downloaded progress value from file has been changed
+        /// </summary>
+        public event PatchFile.DownloadProgressChangedEventHandler FileDownloadProgressChanged;
+        private void OnFileDownloadProgressChanged(object sender, PatchFile.DownloadProgressChangedEventArgs e)
+        {
+            FileDownloadProgressChanged?.Invoke(sender, e);
+        }
+        /// <summary>
+        /// Called when the file has been downloaded
+        /// </summary>
+        public event DownloadCompletedEventHandler FileDownloadCompleted;
+        public delegate void DownloadCompletedEventHandler(object sender, DownloadCompletedEventArgs e);
+        private DownloadCompletedEventArgs OnFileDownloadCompleted(object sender)
+        {
+            var e = new DownloadCompletedEventArgs();
+            FileDownloadCompleted?.Invoke(sender, e);
+            return e;
+        }
+        public class DownloadCompletedEventArgs : EventArgs
+        {
+            public bool CancelUpdate { get; set; }
+            public Func<Task> UpdateAction { get; set; }
+            internal DownloadCompletedEventArgs() {
+                
+            }
+            public async Task ExecuteAction()
+            {
+                await UpdateAction?.Invoke();
+            }
         }
         /// <summary>
         /// Called when the file has been updated
         /// </summary>
-        public event UpdateCompletedEventHandler FileUpdateCompleted;
+        public event PatchFile.UpdateCompletedEventHandler FileUpdateCompleted;
         private void OnFileUpdateCompleted(PatchFile File)
         {
             FileUpdateCompleted?.Invoke(File, EventArgs.Empty);
@@ -549,23 +580,7 @@ namespace AppUpdater
             // call attached event
             PatchCompleted?.Invoke(this,EventArgs.Empty);
         }
-        /// <summary>
-        /// Called when the update has been finished
-        /// </summary>
-        public event UpdateCompletedEventHandler UpdateCompleted;
-        private void OnUpdateCompleted()
-        {
-            UpdateCompleted?.Invoke(this, EventArgs.Empty);
-        }
-        /// <summary>
-        /// Called when the application needs to be restarted to replace itself correctly
-        /// </summary>
-        public event ApplicationRestartEventHandler ApplicationRestart;
-        public delegate void ApplicationRestartEventHandler(object sender, EventArgs e);
-        private void OnApplicationRestart()
-        {
-            ApplicationRestart?.Invoke(this, EventArgs.Empty);
-        }
+
         /// <summary>
         /// Called when the download progress value has changed
         /// </summary>
@@ -587,12 +602,21 @@ namespace AppUpdater
             }
         }
         /// <summary>
-        /// Called when the downloaded progress value from file has changed
+        /// Called when the update has been finished
         /// </summary>
-        public event PatchFile.DownloadProgressChangedEventHandler FileDownloadProgressChanged;
-        private void OnFileDownloadProgressChanged(object sender, PatchFile.DownloadProgressChangedEventArgs e)
+        public event UpdateCompletedEventHandler UpdateCompleted;
+        private void OnUpdateCompleted()
         {
-            FileDownloadProgressChanged?.Invoke(sender, e);
+            UpdateCompleted?.Invoke(this, EventArgs.Empty);
+        }
+        /// <summary>
+        /// Called when the application needs to be restarted to replace itself correctly
+        /// </summary>
+        public event ApplicationRestartEventHandler ApplicationRestart;
+        public delegate void ApplicationRestartEventHandler(object sender, EventArgs e);
+        private void OnApplicationRestart()
+        {
+            ApplicationRestart?.Invoke(this, EventArgs.Empty);
         }
         #endregion
     }

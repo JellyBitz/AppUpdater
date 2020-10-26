@@ -43,21 +43,23 @@ namespace AppDemo
                 tbkUpdateProgressText.Text = "Update available!";
                 btnStart.IsEnabled = btnPause.IsEnabled = true;
 
-                // Start preparing the download
-                await m_Patcher.PrepareDownload(patch);
-                
+                // Initialize files to be updated
+                await m_Patcher.InitializeUpdate(patch);
+
                 // Supported events
-                m_Patcher.FileReadyToDownload += (s, e) =>
+                m_Patcher.FileDownloadReady += (s, e) =>
                 {
                     tbkFileProgressText.Text = ((PatchFile)s).FullPath;
-                    tbkFileProgressPercent.Text = "0%";
-                    slrFileProgress.Value = 0;
                 };
                 m_Patcher.FileDownloadProgressChanged += (s, e) =>
                 {
                     var percent = e.Percentage;
                     tbkFileProgressPercent.Text = Math.Round(percent, 2) + "%";
                     slrFileProgress.Value = percent;
+                };
+                m_Patcher.FileDownloadCompleted += (s, e) =>
+                {
+                    tbkFileProgressPercent.Text = "...";
                 };
                 m_Patcher.FileUpdateCompleted += (s, e) =>
                 {
@@ -83,7 +85,7 @@ namespace AppDemo
                 };
                 m_Patcher.ApplicationRestart += (s, e) =>
                 {
-                    MessageBox.Show(this, "This application needs to be restarted.\r\nPress Ok to continue.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(this, "This application needs to be restarted.\r\nPress OK to continue.", Title, MessageBoxButton.OK, MessageBoxImage.Information);
                 };
             }
             else

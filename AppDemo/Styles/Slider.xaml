@@ -80,6 +80,7 @@
     </ControlTemplate>
 
     <Style x:Key="SliderLoadingStyle" TargetType="{x:Type Slider}">
+        <Setter Property="IsEnabled" Value="False"/>
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="SnapsToDevicePixels" Value="true" />
         <Setter Property="OverridesDefaultStyle" Value="true" />

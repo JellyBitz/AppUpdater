@@ -18,11 +18,11 @@ namespace AppUpdater
         /// <summary>
         /// Bytes received from downloading
         /// </summary>
-        private int m_BytesReceived;
+        private long m_BytesReceived;
         /// <summary>
-        /// Flag indicating if the download has been made successfully
+        /// Flag indicating if the download has been made successfully and is ready to be updated
         /// </summary>
-    	private bool m_IsDownloadCompleted;
+    	private bool m_IsUpdateReady;
         /// <summary>
         /// Check if the download is paused
         /// </summary>
@@ -31,7 +31,7 @@ namespace AppUpdater
 
         #region Public Properties
         /// <summary>
-        /// Relative path where the file will be located after downloading
+        /// Relative path where the file will be located after updating
         /// </summary>
         public string FullPath { get; }
         /// <summary>
@@ -68,7 +68,7 @@ namespace AppUpdater
             if (File.Exists(DownloadPath))
             {
                 // Load length previously downloded
-                m_BytesReceived = (int)new FileInfo(DownloadPath).Length;
+                m_BytesReceived = new FileInfo(DownloadPath).Length;
                 // Check if has been paused before
                 if(m_BytesReceived > 0)
                    m_IsPaused = true;
@@ -90,10 +90,11 @@ namespace AppUpdater
             IsPaused = false;
 
             // Check if file has been downloaded already 
-            int BytesToReceive = (int) await GetContentLength(Url);
+            var BytesToReceive = await GetContentLength(Url);
             if (m_BytesReceived == BytesToReceive)
             {
-                m_IsDownloadCompleted = true;
+                // call event
+                OnDownloadCompleted();
                 return;
             }
 
@@ -109,6 +110,7 @@ namespace AppUpdater
             {
                 using (var responseStream = response.GetResponseStream())
                 {
+                    bool downloadCompleted = false; 
                     using (var fs = new FileStream(DownloadPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
                     {
                         while (!IsPaused)
@@ -120,9 +122,7 @@ namespace AppUpdater
                             // Check if file has been fully downloaded
                             if (bytesRead == 0)
                             {
-                                m_IsDownloadCompleted = true;
-                                // call event
-                                OnDownloadCompleted();
+                                downloadCompleted = true;
                                 break;
                             }
 
@@ -135,6 +135,11 @@ namespace AppUpdater
                         }
                         // Clear file stream cache
                         await fs.FlushAsync();
+                    }
+                    if (downloadCompleted)
+                    {
+                        // call event
+                        OnDownloadCompleted();
                     }
                 }
             }
@@ -152,7 +157,7 @@ namespace AppUpdater
         public async Task Update()
         {
             // Check if the file has been downloaded previously
-            if (m_IsDownloadCompleted)
+            if (m_IsUpdateReady)
             {
                 // Create directory if doesn't exists
                 var dir = Path.GetDirectoryName(FullPath);
@@ -176,7 +181,7 @@ namespace AppUpdater
                 OnUpdateCompleted();
 
                 // Successfully updated, avoid doing it twice
-                m_IsDownloadCompleted = false;
+                m_IsUpdateReady = false;
             }
         }
         #endregion
@@ -202,16 +207,16 @@ namespace AppUpdater
         /// </summary>
         public event DownloadProgressChangedEventHandler DownloadProgressChanged;
         public delegate void DownloadProgressChangedEventHandler(object sender, DownloadProgressChangedEventArgs e);
-        private void OnDownloadProgressChanged(int BytesReceived, int BytesToRead)
+        private void OnDownloadProgressChanged(long BytesReceived, long BytesToRead)
         {
             DownloadProgressChanged?.Invoke(this, new DownloadProgressChangedEventArgs(BytesReceived, BytesToRead));
         }
         public class DownloadProgressChangedEventArgs : EventArgs
         {
-            public int BytesReceived { get; }
-            public int BytesToRead { get; }
+            public long BytesReceived { get; }
+            public long BytesToRead { get; }
             public double Percentage { get { return BytesReceived * 100d / BytesToRead; } }
-            internal DownloadProgressChangedEventArgs(int BytesReceived, int BytesToRead)
+            internal DownloadProgressChangedEventArgs(long BytesReceived, long BytesToRead)
             {
                 this.BytesReceived = BytesReceived;
                 this.BytesToRead = BytesToRead;
@@ -224,6 +229,9 @@ namespace AppUpdater
         public delegate void DownloadCompletedEventHandler(object sender, EventArgs e);
         private void OnDownloadCompleted()
         {
+            // update flag
+            m_IsUpdateReady = true;
+
             DownloadCompleted?.Invoke(this, EventArgs.Empty);
         }
         /// <summary>
